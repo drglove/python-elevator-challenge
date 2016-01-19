@@ -18,8 +18,11 @@ class ElevatorLogic(object):
 
     def __init__(self):
         # Feel free to add any instance variables you want.
-        self.destination_floor = None
         self.callbacks = None
+        self.queue = {}
+        self.queue[UP] = []
+        self.queue[DOWN] = []
+        self.current_queue = None
 
     def on_called(self, floor, direction):
         """
@@ -30,7 +33,13 @@ class ElevatorLogic(object):
         floor: the floor that the elevator is being called to
         direction: the direction the caller wants to go, up or down
         """
-        self.destination_floor = floor
+        # Queue up their request
+        self.queue[direction].append(floor)
+        if self.current_queue is None:
+            if floor > self.callbacks.current_floor:
+                self.current_queue = UP
+            elif floor < self.callbacks.current_floor:
+                self.current_queue = DOWN
 
     def on_floor_selected(self, floor):
         """
@@ -40,15 +49,43 @@ class ElevatorLogic(object):
 
         floor: the floor that was requested
         """
-        self.destination_floor = floor
+        # Figure out which direction we would need to go in
+        if floor > self.callbacks.current_floor:
+            direction = UP
+        elif floor < self.callbacks.current_floor:
+            direction = DOWN
+        else:
+            direction = None
+
+        # Queue up their request
+        if direction is not None and (self.callbacks.motor_direction is None or direction == self.callbacks.motor_direction):
+            self.queue[direction].append(floor)
+            if self.current_queue is None:
+                self.current_queue = direction
 
     def on_floor_changed(self):
         """
         This lets you know that the elevator has moved one floor up or down.
         You should decide whether or not you want to stop the elevator.
         """
-        if self.destination_floor == self.callbacks.current_floor:
+        # Stop when we see a floor in the current queue we need to stop at
+        if self.callbacks.current_floor in self.queue[self.current_queue]:
+            # Pop the element and stop moving
+            i = self.queue[self.current_queue].index(self.callbacks.current_floor)
+            del self.queue[self.current_queue][i]
             self.callbacks.motor_direction = None
+
+        # Check if we need to update which direction we're going in
+        if not self.queue[UP] and not self.queue[DOWN]:
+            # Both queues exhausted
+            self.current_queue = None
+        elif self.queue[UP] and not self.queue[DOWN]:
+            # Out of downwards movements
+            self.current_queue = UP
+        elif not self.queue[UP] and self.queue[DOWN]:
+            # Out of upwards movements
+            self.current_queue = DOWN
+        # else: use the current queue
 
     def on_ready(self):
         """
@@ -56,7 +93,4 @@ class ElevatorLogic(object):
         Maybe passengers have embarked and disembarked. The doors are closed,
         time to actually move, if necessary.
         """
-        if self.destination_floor > self.callbacks.current_floor:
-            self.callbacks.motor_direction = UP
-        elif self.destination_floor < self.callbacks.current_floor:
-            self.callbacks.motor_direction = DOWN
+        self.callbacks.motor_direction = self.current_queue
