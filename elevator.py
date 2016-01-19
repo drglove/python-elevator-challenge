@@ -58,7 +58,7 @@ class ElevatorLogic(object):
             direction = None
 
         # Queue up their request
-        if direction is not None and (self.callbacks.motor_direction is None or direction == self.callbacks.motor_direction):
+        if direction is not None and (self.current_queue is None or direction == self.current_queue):
             self.queue[direction].append(floor)
             if self.current_queue is None:
                 self.current_queue = direction
